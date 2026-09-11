@@ -9,7 +9,14 @@ function running() { const g = new Game(1729, () => .4); g.started = true; g.pau
 function stationary() { const g = running(); g.speed = 0; g.spawnClock = -1000; return g; }
 function advance(g: Game, seconds: number) { for (let i = 0; i < Math.round(seconds * 120); i++) g.update(1 / 120); }
 function near(a: number, b: number, tolerance = 1e-6) { assert.ok(Math.abs(a - b) < tolerance, `${a} differs from ${b}`); }
-function connected(body: Point[]) { for (let i = 1; i < body.length; i++) near(length(body[i - 1], body[i]), 1); }
+function connected(body: Point[]) {
+  for (let i = 1; i < body.length; i++) {
+    const spacing = length(body[i - 1], body[i]);
+    // Arc-length following is exact; at a path crossing, two consecutive
+    // samples can be spatially closer because the head doubled back.
+    assert.ok(spacing <= 1.000001 && spacing > .01, `invalid rope spacing ${spacing}`);
+  }
+}
 
 test('movement is continuous even before the old quarter-second step', () => {
   const game = running(); game.update(.025);
@@ -24,14 +31,23 @@ test('mouse movement supports diagonal targets at a consistent speed', () => {
   near(length(old, game.body[0]), 4 / 120); connected(game.body);
 });
 
+test('the snake keeps moving at constant speed when the cursor is close', () => {
+  const game = running(); game.setMouseTarget({ x: .01, y: .01 });
+  const start = { ...game.body[0] };
+  game.update(.25); near(length(start, game.body[0]), 1);
+  const middle = { ...game.body[0] };
+  game.update(.25); near(length(middle, game.body[0]), 1);
+});
+
 test('mouse control can turn back through the body without damage', () => {
   const game = running(); game.setMouseTarget({ x: -5, y: 0 });
   advance(game, .4); assert.ok(game.body[0].x < -1); assert.equal(game.hp, 10); connected(game.body);
 });
 
-test('a stationary cursor stays anchored to the viewport as it scrolls', () => {
-  const game = running(); game.setMouseTarget({ x: .1, y: .2 });
-  advance(game, 1); near(game.body[0].x - game.camera.x, .1); near(game.body[0].y, .2);
+test('a stationary cursor keeps the last heading as the camera scrolls', () => {
+  const game = running(); game.setMouseTarget({ x: .01, y: .01 });
+  const start = { ...game.body[0] }; advance(game, 1);
+  near(length(start, game.body[0]), 4, .02); near(game.body[0].y, 0, .01); near(game.direction.x, 1);
 });
 
 test('body dragging takes priority over the mouse-follow destination', () => {

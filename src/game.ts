@@ -7,6 +7,8 @@ export class Game {
   body: Point[] = Array.from({ length: 10 }, (_, i) => ({ x: 0 - i, y: 0 }));
   direction: Point = { x: 1, y: 0 };
   private mouseOffset: Point | null = null;
+  private mouseHeading: Point = { x: 1, y: 0 };
+  private headTrail: Point[] = Array.from({ length: 10 }, (_, i) => ({ x: 0 - i, y: 0 }));
   world: World;
   food = new Map<string, Point>();
   moles = new Map<string, Mole>();
@@ -29,6 +31,8 @@ export class Game {
   view(): View { return { ...this.camera, width: 24, height: 18 }; }
   setMouseTarget(target: Point) {
     if (!Number.isFinite(target.x) || !Number.isFinite(target.y)) return;
+    const dx = target.x - this.body[0].x, dy = target.y - this.body[0].y, size = Math.hypot(dx, dy);
+    if (size > .08) this.mouseHeading = { x: dx / size, y: dy / size };
     this.mouseOffset = { x: target.x - this.cameraPosition.x, y: target.y - this.cameraPosition.y };
   }
   damage() {
@@ -48,17 +52,14 @@ export class Game {
     this.immunity = Math.max(0, this.immunity - dt);
     this.collectFood();
     // The cursor remains at the same screen position as the field scrolls beneath it.
-    // A body grab takes priority so the head does not fight a tail pull.
+    // A body grab takes priority so the head does not fight a tail pull. Keep the
+    // last non-zero heading when the cursor is close, so forward speed is constant.
     if (!this.dragState && this.mouseOffset && this.speed > 0) {
       const head = this.body[0];
-      const destination = { x: this.cameraPosition.x + this.mouseOffset.x, y: this.cameraPosition.y + this.mouseOffset.y };
-      const d = length(head, destination);
-      if (d > 1e-6) {
-        this.direction = { x: (destination.x - head.x) / d, y: (destination.y - head.y) / d };
-        const travel = Math.min(d, this.speed * dt);
-        const target = { x: head.x + this.direction.x * travel, y: head.y + this.direction.y * travel };
-        if (!this.moveAnchor(0, target)) this.damage();
-      }
+      this.direction = { ...this.mouseHeading };
+      const travel = this.speed * dt;
+      const target = { x: head.x + this.direction.x * travel, y: head.y + this.direction.y * travel };
+      if (!this.moveAnchor(0, target)) this.damage();
     }
     if (this.dragState) {
       const state = this.dragState;
@@ -106,6 +107,13 @@ export class Game {
       target = { x: Math.min(view.x + view.width / 2 - .5, target.x),
         y: Math.max(-view.height / 2 + .5, Math.min(view.height / 2 - .5, target.y)) };
     }
+    if (index === 0) {
+      if (this.world.sweptCollision(this.body[0], target, SNAKE_RADIUS)) return false;
+      this.syncTrailToBody();
+      this.recordHead(target);
+      this.body = this.followHeadTrail();
+      return true;
+    }
     const result = pullContinuous(this.body, index, target);
     const head = result[0];
     if (head.y < -8.5 || head.y > 8.5 || head.x > view.x + 11.5) return false;
@@ -113,7 +121,41 @@ export class Game {
     // take damage, but it must not act like an anchor that freezes the snake.
     if (this.world.sweptCollision(this.body[0], head, SNAKE_RADIUS)) return false;
     this.body = result;
+    // A body pull changes the path. Start a fresh trail from the exact rope
+    // shape so later head motion follows this new path without drift.
+    this.headTrail = this.body.map(p => ({ ...p }));
     return true;
+  }
+  private syncTrailToBody() {
+    if (this.headTrail.length < this.body.length || !this.headTrail[0] || length(this.headTrail[0], this.body[0]) > .25) {
+      this.headTrail = this.body.map(p => ({ ...p }));
+    }
+  }
+  private recordHead(point: Point) {
+    const last = this.headTrail[0];
+    if (!last || length(last, point) > 1e-8) this.headTrail.unshift({ ...point });
+    const limit = Math.max(64, this.body.length * 160);
+    if (this.headTrail.length > limit) this.headTrail.length = limit;
+  }
+  private followHeadTrail(): Point[] {
+    const trail = this.headTrail;
+    const result: Point[] = [{ ...trail[0] }];
+    let segment = 0, segmentStart = trail[0], distanceBehind = 0;
+    for (let index = 1; index < this.body.length; index++) {
+      const wanted = index * SEGMENT_SPACING;
+      while (segment < trail.length - 1) {
+        const next = trail[segment + 1];
+        const available = length(segmentStart, next);
+        if (distanceBehind + available >= wanted - 1e-9) {
+          const ratio = available > 1e-9 ? (wanted - distanceBehind) / available : 0;
+          result.push({ x: segmentStart.x + (next.x - segmentStart.x) * ratio, y: segmentStart.y + (next.y - segmentStart.y) * ratio });
+          break;
+        }
+        distanceBehind += available; segment++; segmentStart = next;
+      }
+      if (result.length < index + 1) result.push({ ...trail.at(-1)! });
+    }
+    return result;
   }
   contacts(view = this.view()) {
     if (!visible(this.body[0], view)) this.damage();
