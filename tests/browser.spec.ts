@@ -115,11 +115,14 @@ test('long tail, growing, free body dragging, and rendering work in a real brows
 test('game over, restart, and best score persist', async ({ page }) => {
   await page.goto('/');
   await page.clock.install();
+  await page.locator('#player-name').fill('ACE');
+  await page.locator('#player-name').dispatchEvent('change');
   await page.locator('#play').click();
   // With no mouse input, the scrolling course eventually leaves the head behind.
   await page.clock.runFor(18000);
   await expect(page.locator('#hp')).toHaveText('0');
   await expect(page.locator('#overlay-title')).toHaveText('A good little run.');
+  await expect(page.locator('#leaderboard li').first()).toContainText('ACE');
   const best = await page.locator('#best').textContent();
   expect(best).not.toBe('00:00');
   await page.locator('#play').click();
@@ -128,6 +131,7 @@ test('game over, restart, and best score persist', async ({ page }) => {
   await expect(page.locator('#length')).toContainText('10');
   await page.reload();
   await expect(page.locator('#best')).toHaveText(best!);
+  await expect(page.locator('#leaderboard li').first()).toContainText('ACE');
 });
 
 test('the visible restart button resets an active run immediately', async ({ page }) => {

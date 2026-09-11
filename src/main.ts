@@ -18,6 +18,7 @@ document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
       <aside>
         <section class="panel health-panel"><div class="label">KEEP YOUR HEART IN IT <span>♡</span></div><div class="health-number"><strong id="hp">10</strong><span>/ 10 HP</span></div><div id="health-bars"></div><p>Every collision costs one.<br>Make your next move count.</p></section>
         <section class="panel stats"><div><span class="label">SURVIVED</span><strong id="score">00:00</strong></div><div><span class="label">LENGTH</span><strong id="length">10 <small>segments</small></strong></div><div class="best"><span>PERSONAL BEST</span><span id="best">00:00</span></div></section>
+        <section class="panel leaderboard"><div class="label">LOCAL LEADERBOARD <span>TOP 10</span></div><ol id="leaderboard"></ol><label class="name-field">YOUR NAME<input id="player-name" maxlength="12" autocomplete="nickname" placeholder="ROAMER" /></label></section>
         <section class="guide"><div class="eyebrow">A FIELD GUIDE</div><div class="instruction"><span class="instruction-icon">↗</span><div><strong>Lead the way</strong><p>Move your mouse to choose a heading. The snake keeps a constant pace.</p></div></div><div class="instruction"><span class="instruction-icon">⌁</span><div><strong>Save any segment</strong><p>Click and drag any part. Cross your own body safely; every part collects food.</p></div></div><div class="instruction"><span class="instruction-icon warning">3</span><div><strong>Three seconds. Move.</strong><p>Moles appear every second. Blinking ground gives you three seconds to move.</p></div></div><div class="tip">Keep your head in view as the field scrolls right. Your hidden tail follows its path without drifting.</div></section>
       </aside>
     </section>
@@ -29,9 +30,34 @@ const canvas = el('field') as HTMLCanvasElement;
 const renderer = new Renderer(canvas);
 let game = new Game();
 let best = 0, recorded = false;
+type ScoreEntry = { name: string; score: number };
+let leaderboard: ScoreEntry[] = [];
 try { best = Math.max(0, Number(localStorage.getItem('svm-best')) || 0); } catch { /* Storage is optional. */ }
+try {
+  const parsed = JSON.parse(localStorage.getItem('svm-leaderboard') || '[]');
+  if (Array.isArray(parsed)) leaderboard = parsed.filter((entry): entry is ScoreEntry => entry && typeof entry.name === 'string' && Number.isFinite(entry.score)).slice(0, 10);
+} catch { /* Storage is optional. */ }
 const format = (seconds: number) => `${Math.floor(seconds / 60).toString().padStart(2, '0')}:${Math.floor(seconds % 60).toString().padStart(2, '0')}`;
 el('best').textContent = format(best);
+const savedName = (() => { try { return localStorage.getItem('svm-name') || ''; } catch { return ''; } })();
+(el('player-name') as HTMLInputElement).value = savedName;
+const safeName = (name: string) => name.replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character] || '').trim().slice(0, 12) || 'ROAMER';
+function renderLeaderboard() {
+  const list = el('leaderboard');
+  list.innerHTML = leaderboard.length ? leaderboard.map((entry, index) => `<li><span><b>${String(index + 1).padStart(2, '0')}</b>${safeName(entry.name)}</span><strong>${format(entry.score)}</strong></li>`).join('') : '<li class="empty-score">Finish a run to enter.</li>';
+}
+function recordRun() {
+  if (game.elapsed <= 0) return;
+  const name = safeName((el('player-name') as HTMLInputElement).value);
+  leaderboard = [...leaderboard, { name, score: Math.floor(game.elapsed) }].sort((a, b) => b.score - a.score).slice(0, 10);
+  try { localStorage.setItem('svm-leaderboard', JSON.stringify(leaderboard)); } catch { /* Storage is optional. */ }
+  renderLeaderboard();
+}
+(el('player-name') as HTMLInputElement).addEventListener('change', event => {
+  const input = event.currentTarget as HTMLInputElement; input.value = safeName(input.value);
+  try { localStorage.setItem('svm-name', input.value); } catch { /* Storage is optional. */ }
+});
+renderLeaderboard();
 game.replenishFood();
 function release() { game.endDrag(); canvas.classList.remove('dragging'); }
 function pause() { if (!game.started || game.dead) return; game.paused = !game.paused; release(); updateUI(); }
@@ -81,7 +107,7 @@ function updateUI() {
   el('overlay').classList.toggle('hidden', !game.paused && !game.dead);
   if (game.dead) {
     release();
-    if (!recorded) { best = Math.max(best, Math.floor(game.elapsed)); try { localStorage.setItem('svm-best', String(best)); } catch {} recorded = true; }
+    if (!recorded) { best = Math.max(best, Math.floor(game.elapsed)); try { localStorage.setItem('svm-best', String(best)); } catch {} recordRun(); recorded = true; }
     el('best').textContent = format(best);
     el('overlay-tag').textContent = 'ONE MORE TRIP THROUGH THE FIELD?';
     el('overlay-title').textContent = 'A good little run.';
