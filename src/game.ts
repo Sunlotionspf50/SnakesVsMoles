@@ -109,15 +109,15 @@ export class Game {
     const result = pullContinuous(this.body, index, target);
     const head = result[0];
     if (head.y < -8.5 || head.y > 8.5 || head.x > view.x + 11.5) return false;
-    for (let i = 0; i < result.length; i++) {
-      if (this.world.sweptCollision(this.body[i], result[i], SNAKE_RADIUS)) return false;
-      if (i && this.world.sweptCollision(result[i - 1], result[i], SNAKE_RADIUS)) return false;
-    }
+    // Only the head blocks movement. A trailing segment can scrape a wall and
+    // take damage, but it must not act like an anchor that freezes the snake.
+    if (this.world.sweptCollision(this.body[0], head, SNAKE_RADIUS)) return false;
     this.body = result;
     return true;
   }
   contacts(view = this.view()) {
     if (!visible(this.body[0], view)) this.damage();
+    for (const p of this.body) if (visible(p, view) && this.world.collides(p, SNAKE_RADIUS)) this.damage();
     for (const mole of this.moles.values()) {
       if (!mole.emerged || !visible(mole.point, view)) continue;
       for (let i = 0; i < this.body.length; i++) {

@@ -14,6 +14,7 @@ Open the URL printed by Vite. Use a desktop browser with a mouse.
 - **Mouse:** move the pointer over the field to guide the head. The snake follows the cursor's screen position as the field scrolls right. Arrow keys and WASD do not steer.
 - **Mouse drag:** click and hold any head, body, or tail segment to pull it freely. Dragging takes priority over head steering. The body can cross itself without damage; rocks and emerged moles remain dangerous.
 - **P / Escape:** pause and resume. Switching away pauses automatically.
+- **Restart:** click the Restart button at any time to begin a fresh run.
 - Touch peach-colored food with any segment to collect it. Each pickup adds a segment on the next movement or successful pull. Survive for the highest time.
 - Moles spawn every second, accelerating to every half-second after 75 seconds survived. They blink for three seconds before emerging permanently. Warnings that leave view are canceled; offscreen body segments are safe from mole damage.
 - Moles, hitting rocks, and letting the head fall out of view cost 1 of 10 HP, with one second of immunity after a hit.

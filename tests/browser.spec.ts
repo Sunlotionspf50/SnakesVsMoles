@@ -129,3 +129,16 @@ test('game over, restart, and best score persist', async ({ page }) => {
   await page.reload();
   await expect(page.locator('#best')).toHaveText(best!);
 });
+
+test('the visible restart button resets an active run immediately', async ({ page }) => {
+  await page.goto('/');
+  await page.clock.install();
+  await page.locator('#play').click();
+  await page.clock.runFor(1200);
+  await expect(page.locator('#score')).not.toHaveText('00:00');
+  await page.locator('#restart').click();
+  await expect(page.locator('#hp')).toHaveText('10');
+  await expect(page.locator('#length')).toContainText('10');
+  await expect(page.locator('#score')).toHaveText('00:00');
+  await expect(page.locator('#overlay')).toHaveClass('hidden');
+});

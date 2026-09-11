@@ -98,6 +98,16 @@ test('fast head pulls cannot tunnel through a rock', () => {
   assert.ok(game.body[0].x < .3); assert.equal(game.dragState!.valid, false); connected(game.body);
 });
 
+test('a tail touching a wall does not freeze head movement', () => {
+  const game = stationary();
+  game.world.blocked = p => p.x === -9 && p.y === 0;
+  game.beginDrag(0); game.setDragTarget({ x: 1.5, y: 2.5 });
+  advance(game, .3);
+  assert.ok(game.body[0].x > .5 && game.body[0].y > .5);
+  assert.equal(game.hp, 9); // The tail is still a real collision, just not an anchor.
+  assert.equal(game.dead, false); connected(game.body);
+});
+
 test('three-second mole warnings remain harmless until emergence', () => {
   const game = stationary(); game.moles.set('m', { point: { x: .25, y: .2 }, age: 0, emerged: false });
   advance(game, 2.9); assert.equal(game.hp, 10);

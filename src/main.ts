@@ -6,7 +6,7 @@ import { nearestSegment } from './drag';
 document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
   <main class="shell">
     <header><a class="brand" href="./" aria-label="Snakes vs. Moles home"><span class="brand-icon">s<span>•</span></span><span>SNAKES <i>vs.</i> MOLES<small>A LITTLE WILD. A LITTLE DANGEROUS.</small></span></a><span class="build"><span></span> FIELD TEST / 001</span></header>
-    <section class="heading"><div><div class="eyebrow">THE EASTBOUND MEADOW</div><h1>Watch your tail.</h1><p>The field keeps moving. Find a gap, grab a snack, and keep up.</p></div><button id="pause" class="secondary" disabled>Ⅱ <span>Pause</span> <kbd>P</kbd></button></section>
+    <section class="heading"><div><div class="eyebrow">THE EASTBOUND MEADOW</div><h1>Watch your tail.</h1><p>The field keeps moving. Find a gap, grab a snack, and keep up.</p></div><div class="heading-actions"><button id="restart" class="secondary">↻ <span>Restart</span></button><button id="pause" class="secondary" disabled>Ⅱ <span>Pause</span> <kbd>P</kbd></button></div></section>
     <section class="game-layout">
       <div class="field-wrap">
         <div class="field-bar"><span><span class="live-dot"></span> <span id="status">READY TO ROLL</span></span><span id="coordinates">00 : 00</span></div>
@@ -35,12 +35,17 @@ el('best').textContent = format(best);
 game.replenishFood();
 function release() { game.endDrag(); canvas.classList.remove('dragging'); }
 function pause() { if (!game.started || game.dead) return; game.paused = !game.paused; release(); updateUI(); }
+function restart() {
+  release(); game = new Game(); game.replenishFood(); recorded = false;
+  game.started = true; game.paused = false; accumulator = 0; updateUI();
+}
 function play() {
   if (game.dead) { game = new Game(); game.replenishFood(); recorded = false; }
   game.started = true; game.paused = false; accumulator = 0; updateUI();
 }
 el('play').addEventListener('click', play);
 el('pause').addEventListener('click', pause);
+el('restart').addEventListener('click', restart);
 window.addEventListener('keydown', e => {
   if ((e.key.toLowerCase() === 'p' || e.key === 'Escape') && !e.repeat) { e.preventDefault(); pause(); }
 });
@@ -71,6 +76,7 @@ function updateUI() {
   el('coordinates').textContent = `${Math.round(game.camera.x)} : ${Math.round(game.camera.y)}`;
   el('status').textContent = game.dead ? 'THE MEADOW WINS' : game.paused ? game.started ? 'TAKING A BREATHER' : 'READY TO ROLL' : 'SCROLLING EAST →';
   (el('pause') as HTMLButtonElement).disabled = !game.started || game.dead;
+  (el('restart') as HTMLButtonElement).disabled = false;
   el('pause').innerHTML = game.paused ? '▷ <span>Resume</span> <kbd>P</kbd>' : 'Ⅱ <span>Pause</span> <kbd>P</kbd>';
   el('overlay').classList.toggle('hidden', !game.paused && !game.dead);
   if (game.dead) {
